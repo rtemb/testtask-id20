@@ -1,7 +1,6 @@
 <?php
 
 require_once __DIR__ . '/../core/model.php';
-require_once __DIR__ . '/../classes/transactioncorrection.class.php';
 
 /**
  * Модель транзакций
@@ -16,24 +15,24 @@ class Transaction extends Model {
 	/** @var string номер карты */
 	public $cardNumber;
 	/** @var string  дата операции*/
-	public $operationDate;
-	/** @var double обьем */
+	public $date;
+	/** @var float обьем */
 	public $volume;
 	/** @var string наименование сервиса */
-	public $serviceName;
+	public $service;
 	/** @var int id станци */
-	public $stationId;
+	public $addressId;
 
 	
 	public function __construct($data = false) {
 		parent::__construct();
 		if (!empty($data)) {
-			$this->id			= (int)		array_key_exists('id', $data) ? $data['id'] : false;
-			$this->cardNumber	= (string)	array_key_exists('card_number', $data) ? $data['card_number'] : false;
-			$this->operationDate= (string)	array_key_exists('operation_date', $data) ? $data['operation_date'] : false;
-			$this->volume		= (double)	array_key_exists('volume', $data) ? $data['volume'] : false;
-			$this->serviceName	= (string)	array_key_exists('service_name', $data) ? $data['service_name'] : false;
-			$this->stationId	= (int)		array_key_exists('station_id', $data) ? $data['station_id'] : false;
+			$this->id			= array_key_exists('id', $data) ? (int) $data['id'] : false;
+			$this->cardNumber	= array_key_exists('card_number', $data) ? (string) $data['card_number'] : false;
+			$this->date			= array_key_exists('date', $data) ? (string) $data['date'] : false;
+			$this->volume		= array_key_exists('volume', $data) ? (float) $data['volume'] : false;
+			$this->service		= array_key_exists('service', $data) ? (string) $data['service'] : false;
+			$this->addressId	= array_key_exists('address_id', $data) ? (int) $data['address_id'] : false;
 		}
 	}
 	
@@ -41,13 +40,13 @@ class Transaction extends Model {
 	 * Возвращается обьект транзакции по id
 	 * 
 	 * @author Barhanov Artem <darakon92@gmail.com>
- 	 * @version 1.0 2017-08-06
+ 	 * @version 1.1 2017-08-07
 	 * 
 	 * @param int $id - id транзакции
 	 * @return Transaction
 	 */
 	public static function getById(int $id): Transaction {
-		$sql = 'SELECT id, card_number, operation_date, volume, service_name, station_id FROM transactions WHERE id = ?';
+		$sql = 'SELECT id, card_number, date, volume, service, address_id FROM data WHERE id = ?';
 		$res = self::_db()->fetchFirstColumn($sql, $id);
 		return new self($res);
 	}
@@ -56,19 +55,18 @@ class Transaction extends Model {
 	 * Обновляет обьем транзакции
 	 * 
 	 * @author Barhanov Artem <darakon92@gmail.com>
- 	 * @version 1.0 2017-08-06
+ 	 * @version 1.1 2017-08-07
 	 *
-	 * @param TransactionCorrection $TransactionCorrection - обьект корекции
-	 * @return bool
+	 * @return bool|null
 	 */
-	public function makeCorrection(TransactionCorrection $TransactionCorrection): bool {
+	public function makeCorrection() {
+		$lastTransaction = $this->getLastOutlay();
+		if (!$lastTransaction->id) {
+			return null;
+		}
 		self::_db()->transactionStart();
-		
-		$sql = 'UPDATE transactions SET volume = ? WHERE id = ?';
-		$res[] = self::_db()->update($sql, $TransactionCorrection->recalculate(), $TransactionCorrection->id);
-		$sql = 'DELETE FROM transactions WHERE id = ?';
-		$res[] = self::_db()->update($sql, $TransactionCorrection->correctionId);
-
+		$res[] = $lastTransaction->updateVolume($this->volume);
+		$res[] = $this->delete();
 		foreach ($res as $value) {
 			if (!$value) {
 				self::_db()->transactionRollback();
@@ -80,70 +78,57 @@ class Transaction extends Model {
 	}
 	
 	/**
-	 * Возвращает список обьектов коррекций для таблицы транзакций
+	 * Возвращает список id возвратов
 	 * 
 	 * @author Barhanov Artem <darakon92@gmail.com>
- 	 * @version 1.0 2017.08.06
+ 	 * @version 1.1 2017.08.07
 	 *
 	 * @return array
 	 */
-	public static function getCorrections(): array {
-		$sql = 'SELECT DISTINCT a.id AS `correction_id`, a.volume AS `correction_volume` 
-			FROM transactions AS a JOIN transactions AS b ON a.volume > 0 AND b.volume < 0';
-		$correctionEntries = self::_db()->fetchAll($sql);
-		
-		$ids = [];
-		foreach ($correctionEntries as $value) {
-			$ids[] = $value['correction_id'] - 1;
-		}
-		$entriesForCorrection = self::getTransactionDataByIds($ids);
-		$data = self::prepareRawData($correctionEntries, $entriesForCorrection);
-		$corrections = [];
-		if (is_array($data)) {
-			foreach($data as $row) {
-				$corrections[] = new TransactionCorrection($row);
-			}
-		}
-		return $corrections;
+	public static function getCorrectionsIds(): array {
+		$sql = 'SELECT id FROM `data` WHERE volume > 0';
+		return self::_db()->fetchAll($sql);
 	}
 
 	/**
-	 * Возвращает данные по транзакциям по списку id транзакций
+	 * Возвращает послежнюю транзакцию по карте
+	 * Уситывает станцию и адрес
 	 * 
 	 * @author Barhanov Artem <darakon92@email.com>
- 	 * @version 1.0 2017.08.06
+ 	 * @version 1.1 2017.08.07
 	 *
-	 * @return array
+	 * @return Transaction
 	 */
-	private static function getTransactionDataByIds($ids): array {
-		$in  = '(' . str_repeat('?,', count($ids) - 1) . '?' . ')';
-		$sql = 'SELECT id, volume FROM transactions WHERE id IN' . $in;
-		$entriesForCorrection = self::_db()->fetchAll($sql, $ids);
-		return $entriesForCorrection;
+	private function getLastOutlay(): Transaction {
+		$sql = 'SELECT id, card_number, date, volume, service, address_id FROM `data` WHERE `card_number` = ? AND address_id = ? AND `volume` <= 0 AND service = ? LIMIT 1';
+		$data = self::_db()->fetchFirstColumn($sql, $this->cardNumber, $this->addressId, $this->service);
+		return new self($data);
 	}
 
 	/**
-	 * Подготавливает данные для передачи в конструктор TransactionCorrection
+	 * Обновляет volume операции 
 	 * 
 	 * @author Barhanov Artem <darakon92@gmail.com>
- 	 * @version 1.0 2017.08.06
+ 	 * @version 1.1 2017.08.07
 	 *
-	 * @return array
+	 * @return bool
 	 */
-	private static function prepareRawData(array $correctionEntries, array $entriesForCorrection): array {
-		$combinedArray = [];
-		foreach($entriesForCorrection as $row) {
-			foreach ($correctionEntries as $value) {
-				if ($row['id'] == $value['correction_id'] - 1) {
-					$combinedArray[] = [
-						'id' => $row['id'],
-						'correction_id' => $value['correction_id'],
-						'volume' => $row['volume'],
-						'correction_volume' => $value['correction_volume']
-					];
-				}
-			}
-		}
-		return $combinedArray;
+	public function updateVolume(float $newVolume): bool {
+		$sql = 'UPDATE data SET volume = ? WHERE id = ?';
+		return self::_db()->update($sql, $this->volume + $newVolume, $this->id);
+	}
+
+	/**
+	 * Удаляет транзакцию
+	 * 
+	 * @author Barhanov Artem <darakon92@gmail.com>
+ 	 * @version 1.0 2017.08.07
+	 *
+	 * @return bool
+	 */
+	public function delete(): bool {
+		$sql = 'DELETE FROM data WHERE id = ?';
+		$res =  self::_db()->query($sql, $this->id);
+		return (intval($res->errorCode()) ? false : true);
 	}
 }

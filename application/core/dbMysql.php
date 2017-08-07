@@ -43,7 +43,8 @@ class dbMysql {
 	public function fetchFirstColumn() {
 		$args = func_get_args();
 		$result = call_user_func_array(array($this, 'query'), $args);
-		return $result->fetchAll()[0];
+		$res = $result->fetchAll();
+		return empty($res) ? $res : $res[0];
 	}
 	
 	public function fetchFirstField() {

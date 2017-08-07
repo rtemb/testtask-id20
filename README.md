@@ -7,11 +7,9 @@
 	const DB_NAME = '';
 ```
 
-Дамп таблиы в файле: bump_2017-08-06.sql
-
 Для запуска приложения:
 
 ```
-$ php transactions_correction.php
+$ php data_correction.php
 
 ```
