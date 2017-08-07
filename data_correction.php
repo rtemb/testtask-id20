@@ -21,7 +21,7 @@ $correctionIds = Transaction::getCorrectionsIds();
 echo ("[" . date('Y-m-d H:i:s') . "]" . " [INFO]  Selected " . count($correctionIds) . " refund ids \n"); 
 $chunks = array_chunk($correctionIds, CORRECTIONS_PER_PART);
 foreach ($chunks as $part) {
-	foreach ($part as $key => $value) {
+	foreach ($part as $value) {
 		$id = (int) $value['id'];
 		$Transaction = Transaction::getById($id);
 		$res = $Transaction->makeCorrection();
@@ -32,6 +32,7 @@ foreach ($chunks as $part) {
 			$dontCorrected++;
 		} else {
 			$success++;
+			echo ("[" . date('Y-m-d H:i:s') . "]" . " [WARN]  while correction refund transaction id:  " . $id ."\n");
 		}
 	}
 	sleep(PER_PART_SLEEP_SECONDS);

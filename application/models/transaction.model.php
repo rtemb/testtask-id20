@@ -11,17 +11,17 @@ require_once __DIR__ . '/../core/model.php';
 class Transaction extends Model {
 	
 	/** @var int id транзакции */
-	public $id;
+	private $id;
 	/** @var string номер карты */
-	public $cardNumber;
+	private $cardNumber;
 	/** @var string  дата операции*/
-	public $date;
+	private $date;
 	/** @var float обьем */
-	public $volume;
+	private $volume;
 	/** @var string наименование сервиса */
-	public $service;
+	private $service;
 	/** @var int id станци */
-	public $addressId;
+	private $addressId;
 
 	
 	public function __construct($data = false) {
@@ -100,8 +100,8 @@ class Transaction extends Model {
 	 * @return Transaction
 	 */
 	private function getLastOutlay(): Transaction {
-		$sql = 'SELECT id, card_number, date, volume, service, address_id FROM `data` WHERE `card_number` = ? AND address_id = ? AND `volume` <= 0 AND service = ? LIMIT 1';
-		$data = self::_db()->fetchFirstColumn($sql, $this->cardNumber, $this->addressId, $this->service);
+		$sql = 'SELECT id, card_number, date, volume, service, address_id FROM `data` WHERE id < ? AND `card_number` = ? AND address_id = ? AND `volume` <= 0 AND service = ? LIMIT 1';
+		$data = self::_db()->fetchFirstColumn($sql, $this->id, $this->cardNumber, $this->addressId, $this->service);
 		return new self($data);
 	}
 
