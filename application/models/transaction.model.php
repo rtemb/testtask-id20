@@ -85,14 +85,14 @@ class Transaction extends Model {
 	 *
 	 * @return array
 	 */
-	public static function getCorrectionsIds(): array {
+	public static function getRefundIds(): array {
 		$sql = 'SELECT id FROM `data` WHERE volume > 0';
 		return self::_db()->fetchAll($sql);
 	}
 
 	/**
-	 * Возвращает послежнюю транзакцию по карте
-	 * Уситывает станцию и адрес
+	 * Возвращает последнюю транзакцию по карте до возврата
+	 * Учитывает станцию и адрес
 	 * 
 	 * @author Barhanov Artem <darakon92@email.com>
  	 * @version 1.1 2017.08.07

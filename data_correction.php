@@ -17,7 +17,7 @@ $fails = 0;
 $success = 0;
 $dontCorrected = 0;
 
-$correctionIds = Transaction::getCorrectionsIds();
+$correctionIds = Transaction::getRefundIds();
 echo ("[" . date('Y-m-d H:i:s') . "]" . " [INFO]  Selected " . count($correctionIds) . " refund ids \n"); 
 $chunks = array_chunk($correctionIds, CORRECTIONS_PER_PART);
 foreach ($chunks as $part) {
@@ -32,7 +32,6 @@ foreach ($chunks as $part) {
 			$dontCorrected++;
 		} else {
 			$success++;
-			echo ("[" . date('Y-m-d H:i:s') . "]" . " [WARN]  while correction refund transaction id:  " . $id ."\n");
 		}
 	}
 	sleep(PER_PART_SLEEP_SECONDS);
@@ -40,7 +39,7 @@ foreach ($chunks as $part) {
 
 if (!$fails) {
 	echo ("[" . date('Y-m-d H:i:s') . "]" . " [OK]    " . $success . " transactions were corrected \n");
-	echo ("[" . date('Y-m-d H:i:s') . "]" . " [OK]    For " . $dontCorrected . " can't find previous operations \n");
+	echo ("[" . date('Y-m-d H:i:s') . "]" . " [OK]    For " . $dontCorrected . " can't find previous operation \n");
 	exit(0);
 }
 
